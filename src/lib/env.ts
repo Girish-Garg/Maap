@@ -10,7 +10,11 @@
 function required(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `Missing environment variable ${name}. Copy .env.example to .env.local and fill it in (see README).`,
+      `Missing environment variable ${name}. ` +
+        `Local dev: copy .env.example to .env.local and fill it in. ` +
+        `Production: set it in your hosting provider's config (Vercel: Project Settings → Environment Variables; ` +
+        `Heroku: Config Vars), then redeploy so the new build embeds it. ` +
+        `NEXT_PUBLIC_* values are baked in at build time, not read at runtime.`,
     );
   }
   return value;
