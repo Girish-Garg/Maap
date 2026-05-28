@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Browser-tab favicon (Maap mark, design.md §2.2). Rounded background so it
+       reads as an icon at small sizes; the maskable PWA icon lives at icon.svg. -->
+  <rect width="64" height="64" rx="12" fill="#1C1917"/>
+  <g fill="#C2410C">
+    <rect x="18" y="19" width="28" height="7" rx="3.5"/>
+    <rect x="14" y="29" width="36" height="7" rx="3.5"/>
+    <rect x="22" y="39" width="20" height="7" rx="3.5"/>
+  </g>
+</svg>

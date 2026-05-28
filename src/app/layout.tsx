@@ -6,8 +6,15 @@ import { PwaRegister } from "@/components/pwa-register";
 export const metadata: Metadata = {
   title: "Maap",
   description: "Precise wood measurement.",
-  // iOS: launch standalone from the home screen.
+  // Browser-tab favicon (served as a static file in /public, avoids the
+  // app/icon.* convention which can 500 on some Node hosts).
+  icons: { icon: "/favicon.svg" },
+  // iOS: launch standalone from the home screen. (Emits the apple-prefixed meta.)
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Maap" },
+  // The apple-mobile-web-app-capable meta is now deprecated in the spec; add the
+  // standard mobile-web-app-capable alongside it so modern browsers stop warning
+  // (iOS still relies on the apple-prefixed one for standalone launch).
+  other: { "mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
