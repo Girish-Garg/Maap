@@ -59,9 +59,29 @@ const MAX_LOGO_BYTES = 1_048_576; // 1 MB, matches the bucket limit.
 const LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"];
 
 /**
- * Uploads a logo to logos/<user_id>/logo.<ext> (overwriting any previous one)
- * and stores its public URL on the profile. Returns the cache-busted URL.
- * Validates size and type client-side before the network call.
+ * Lists every file under logos/<user_id>/ and deletes them. Used before an
+ * upload (to avoid orphans when the extension changes) and on remove.
+ * Returns silently if nothing's there.
+ */
+async function clearUserLogoFiles(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<void> {
+  const { data: files, error } = await supabase.storage
+    .from("logos")
+    .list(userId);
+  if (error) throw error;
+  if (!files || files.length === 0) return;
+  const paths = files.map((f) => `${userId}/${f.name}`);
+  const { error: delErr } = await supabase.storage.from("logos").remove(paths);
+  if (delErr) throw delErr;
+}
+
+/**
+ * Uploads a logo to logos/<user_id>/logo.<ext>. Any previous file in the user's
+ * folder is removed first - this handles the case where the old logo was a
+ * .png and the new one is a .jpg (a plain overwrite would leave the .png as an
+ * orphan in Storage). Returns the cache-busted public URL.
  */
 export function useUploadLogo() {
   const supabase = createClient();
@@ -78,6 +98,9 @@ export function useUploadLogo() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
+
+      // Drop any previous file(s) first so we never leave orphans behind.
+      await clearUserLogoFiles(supabase, user.id);
 
       const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       const path = `${user.id}/logo.${ext}`;
@@ -96,6 +119,33 @@ export function useUploadLogo() {
         .eq("user_id", user.id);
       if (profErr) throw profErr;
       return url;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKey }),
+  });
+}
+
+/**
+ * Removes the logo: deletes every file under logos/<user_id>/ and clears
+ * logo_url on the profile. Both steps run together so a successful remove
+ * leaves nothing behind in Storage.
+ */
+export function useRemoveLogo() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      await clearUserLogoFiles(supabase, user.id);
+
+      const { error: profErr } = await supabase
+        .from("user_profiles")
+        .update({ logo_url: null, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+      if (profErr) throw profErr;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKey }),
   });

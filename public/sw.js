@@ -7,7 +7,7 @@
  * Bumping CACHE busts every previously-cached response on activation, which is
  * how we recover from a poisoned redirect being cached.
  */
-const CACHE = "maap-v2";
+const CACHE = "maap-v3";
 
 /** Paths whose responses must never be cached (auth callbacks return transient
  *  redirects; caching one stale redirect bricks future sign-ins). */
@@ -43,22 +43,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Page navigations: network-first, fall back to cache, then the app shell.
+  // Page navigations: stale-while-revalidate. Return the cached page instantly
+  // (if any) so clicks feel snappy; refresh the cache in the background so the
+  // next visit is up to date. First visit to a route still waits for network.
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          // Only cache successful, non-redirect responses; never store a 3xx
-          // that could send the next visitor somewhere wrong.
-          if (res.ok && !res.redirected && res.type === "basic") {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() =>
-          caches.match(req).then((r) => r || caches.match("/projects")),
-        ),
+      caches.match(req).then((cached) => {
+        const fresh = fetch(req)
+          .then((res) => {
+            // Never cache redirects or error responses - that's how a bad
+            // auth redirect could poison the cache.
+            if (res.ok && !res.redirected && res.type === "basic") {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, copy));
+            }
+            return res;
+          })
+          .catch(() => cached || caches.match("/projects"));
+        return cached || fresh;
+      }),
     );
     return;
   }

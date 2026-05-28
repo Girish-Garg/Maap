@@ -6,7 +6,9 @@ import {
   useProfile,
   useUpdateProfile,
   useUploadLogo,
+  useRemoveLogo,
 } from "@/lib/db/profile";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +23,7 @@ export function BusinessProfileForm() {
   const { data: profile, isLoading } = useProfile();
   const update = useUpdateProfile();
   const uploadLogo = useUploadLogo();
+  const removeLogo = useRemoveLogo();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -56,8 +59,19 @@ export function BusinessProfileForm() {
     setLogoError("");
     try {
       await uploadLogo.mutateAsync(file);
+      toast.success("Logo uploaded.");
     } catch (err) {
       setLogoError(err instanceof Error ? err.message : "Upload failed.");
+    }
+  }
+
+  async function handleLogoRemove() {
+    setLogoError("");
+    try {
+      await removeLogo.mutateAsync();
+      toast.success("Logo removed.");
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : "Couldn't remove logo.");
     }
   }
 
@@ -137,7 +151,8 @@ export function BusinessProfileForm() {
               <Button
                 variant="secondary"
                 onClick={() => fileInput.current?.click()}
-                disabled={uploadLogo.isPending}
+                loading={uploadLogo.isPending}
+                disabled={removeLogo.isPending}
               >
                 {uploadLogo.isPending
                   ? "Uploading…"
@@ -148,9 +163,11 @@ export function BusinessProfileForm() {
               {profile?.logo_url && (
                 <Button
                   variant="ghost"
-                  onClick={() => update.mutate({ logo_url: null })}
+                  onClick={handleLogoRemove}
+                  loading={removeLogo.isPending}
+                  disabled={uploadLogo.isPending}
                 >
-                  Remove
+                  {removeLogo.isPending ? "Removing…" : "Remove"}
                 </Button>
               )}
             </div>

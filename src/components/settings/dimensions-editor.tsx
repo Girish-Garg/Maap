@@ -124,7 +124,7 @@ export function DimensionsEditor() {
 
       <div className="flex items-center justify-between border-t border-border pt-4">
         <p className="text-xs text-text-3">
-          Restore the original Excel-derived values.
+          Restore the original values.
         </p>
         <Button variant="secondary" onClick={() => setResetOpen(true)}>
           Reset to defaults
