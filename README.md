@@ -106,69 +106,6 @@ password, and you'll land signed in. Visit **Settings** to fill in your
 business profile (name + address + phone) - the PDF Export button stays
 disabled until you do.
 
-## Deploying to Vercel
-
-The app is fully Vercel-ready (no extra config needed). The flow:
-
-### 1. Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin git@github.com:<you>/maap.git
-git push -u origin main
-```
-
-### 2. Import the repo on Vercel
-
-- Sign in to [vercel.com](https://vercel.com) and click **Add New -> Project**.
-- Import your GitHub repo. Vercel will auto-detect Next.js.
-
-### 3. Add environment variables
-
-In the **Configure Project** step (or later under **Project Settings ->
-Environment Variables**), add the same two values as your `.env.local`:
-
-| Name                                  | Value                                |
-| ------------------------------------- | ------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`            | `https://<your-ref>.supabase.co`     |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`| `sb_publishable_...`                 |
-
-Apply them to all three environments (Production, Preview, Development).
-
-### 4. Deploy
-
-Click **Deploy**. The first build takes 1-2 minutes. When it's done, copy the
-production URL (e.g. `https://maap-yourname.vercel.app`).
-
-### 5. Tell Supabase about your production URL
-
-In Supabase, **Authentication -> URL Configuration**:
-
-- Set **Site URL** to your Vercel URL.
-- Under **Redirect URLs**, add your Vercel URL (and any preview-deploy domains
-  you want to allow, e.g. `https://maap-yourname-*.vercel.app`).
-
-(Email + password auth doesn't strictly need redirect URLs, but Site URL is
-used for any password-recovery emails Supabase sends.)
-
-### 6. Try it
-
-- Visit your Vercel URL on a phone and your laptop.
-- Create the account, fill in the business profile, create a project,
-  download a bill, and try the share link from an incognito window.
-- On Android Chrome / Edge / Safari: tap the browser menu and choose **Install
-  app** / **Add to Home Screen** to install Maap as a PWA. The service worker
-  is production-only, so offline page loads will work once installed.
-
-### Future deploys
-
-Push to `main` -> Vercel builds and promotes automatically. Open a PR -> Vercel
-gives you a preview URL per commit. To roll back, promote a previous
-deployment in the Vercel dashboard.
-
 ## Scripts
 
 | Command             | What it does                                   |
@@ -219,13 +156,3 @@ public/
 supabase/migrations/            forward-only SQL migrations
 ```
 
-## Notes
-
-- The PDF uses "Rs." rather than the rupee glyph because react-pdf's default
-  Helvetica doesn't ship that codepoint. Embedding a rupee-capable font would
-  require a network fetch at render time, which would break offline use.
-- The iOS home-screen icon is deferred (architecture's "open visual choices"
-  note). Android installs use the SVG glyph in `public/icon.svg`.
-- The service worker is intentionally **disabled in `next dev`** to avoid
-  stale-cache issues during development. It registers automatically in
-  production builds.
