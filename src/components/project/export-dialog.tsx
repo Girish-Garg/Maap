@@ -1,8 +1,10 @@
 "use client";
 
 import { createElement, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useProfile } from "@/lib/db/profile";
 import { useSaveSnapshot, buildSnapshotData } from "@/lib/db/snapshots";
+import { toast } from "@/lib/toast";
 import type { Prices } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { clsx } from "@/lib/clsx";
@@ -52,6 +54,7 @@ export function ExportDialog({
   pawaEntries,
   dimensions,
 }: Props) {
+  const router = useRouter();
   const { data: profile } = useProfile();
   const saveSnapshot = useSaveSnapshot(project.id);
   const [open, setOpen] = useState(false);
@@ -118,13 +121,15 @@ export function ExportDialog({
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+      const filename = `${fileStem(project.name)}-${timestamp()}.pdf`;
       a.href = url;
-      a.download = `${fileStem(project.name)}-${timestamp()}.pdf`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
       setOpen(false);
+      toast.success(`Downloaded ${filename}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't generate the PDF.");
     } finally {
@@ -132,18 +137,20 @@ export function ExportDialog({
     }
   }
 
+  function handleExportClick() {
+    if (!hasBusinessName) {
+      toast.info("Add your business name in Settings to export.", {
+        label: "Settings",
+        onClick: () => router.push("/settings"),
+      });
+      return;
+    }
+    setOpen(true);
+  }
+
   return (
     <>
-      <Button
-        variant="secondary"
-        disabled={!hasBusinessName}
-        title={
-          hasBusinessName
-            ? undefined
-            : "Add your business name in Settings to export"
-        }
-        onClick={() => setOpen(true)}
-      >
+      <Button variant="secondary" onClick={handleExportClick}>
         Export
       </Button>
 
@@ -199,7 +206,12 @@ export function ExportDialog({
               >
                 Cancel
               </Button>
-              <Button fullWidth disabled={!selected || busy} onClick={download}>
+              <Button
+                fullWidth
+                loading={busy}
+                disabled={!selected}
+                onClick={download}
+              >
                 {busy ? "Generating…" : "Download"}
               </Button>
             </div>

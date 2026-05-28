@@ -71,7 +71,11 @@ export function EditProjectForm({ projectId }: { projectId: string }) {
           <p className="text-sm text-error">Couldn&apos;t save. Try again.</p>
         )}
         <div className="flex gap-3">
-          <Button type="submit" disabled={!name.trim() || update.isPending}>
+          <Button
+            type="submit"
+            disabled={!name.trim()}
+            loading={update.isPending}
+          >
             {update.isPending ? "Saving…" : "Save"}
           </Button>
           <Button type="button" variant="secondary" onClick={() => router.back()}>

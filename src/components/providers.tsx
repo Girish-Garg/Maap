@@ -5,6 +5,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { get, set, del } from "idb-keyval";
+import { Toaster } from "@/components/ui/toaster";
 
 const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -66,6 +67,7 @@ export function Providers({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <Toaster />
     </PersistQueryClientProvider>
   );
 }

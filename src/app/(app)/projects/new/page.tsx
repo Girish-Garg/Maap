@@ -65,7 +65,11 @@ export default function NewProjectPage() {
           </p>
         )}
         <div className="flex gap-3">
-          <Button type="submit" disabled={!name.trim() || createProject.isPending}>
+          <Button
+            type="submit"
+            disabled={!name.trim()}
+            loading={createProject.isPending}
+          >
             {createProject.isPending ? "Creating…" : "Create project"}
           </Button>
           <Button

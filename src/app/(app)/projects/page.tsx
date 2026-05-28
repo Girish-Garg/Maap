@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useProjects } from "@/lib/db/projects";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/format";
 
 /** Project list (design.md §7.2). The app's home. */
@@ -24,7 +25,19 @@ export default function ProjectsPage() {
         </Link>
       </header>
 
-      {isLoading && <p className="text-sm text-text-3">Loading…</p>}
+      {isLoading && (
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <li key={i}>
+              <Card className="h-full">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="mt-2 h-3 w-1/2" />
+                <Skeleton className="mt-3 h-3 w-1/3" />
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {isError && (
         <p className="text-sm text-error">Couldn&apos;t load projects.</p>

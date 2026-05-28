@@ -3,8 +3,17 @@
  * loads and previously-visited pages work without network. Only same-origin GETs
  * are handled - Supabase API calls pass through untouched (their offline story is
  * the IndexedDB query cache + write queue, not the SW).
+ *
+ * Bumping CACHE busts every previously-cached response on activation, which is
+ * how we recover from a poisoned redirect being cached.
  */
-const CACHE = "maap-v1";
+const CACHE = "maap-v2";
+
+/** Paths whose responses must never be cached (auth callbacks return transient
+ *  redirects; caching one stale redirect bricks future sign-ins). */
+function isUncacheable(pathname) {
+  return pathname.startsWith("/auth/") || pathname === "/login";
+}
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -28,13 +37,23 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // leave Supabase/CDN alone
 
+  // Auth flows: always go to the network, never read or write the cache.
+  if (isUncacheable(url.pathname)) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
   // Page navigations: network-first, fall back to cache, then the app shell.
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
+          // Only cache successful, non-redirect responses; never store a 3xx
+          // that could send the next visitor somewhere wrong.
+          if (res.ok && !res.redirected && res.type === "basic") {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
           return res;
         })
         .catch(() =>
@@ -48,6 +67,7 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith("/_next/") ||
     url.pathname.startsWith("/icon") ||
+    url.pathname === "/favicon.svg" ||
     url.pathname === "/manifest.webmanifest"
   ) {
     event.respondWith(
@@ -55,8 +75,10 @@ self.addEventListener("fetch", (event) => {
         (cached) =>
           cached ||
           fetch(req).then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, copy));
+            }
             return res;
           }),
       ),

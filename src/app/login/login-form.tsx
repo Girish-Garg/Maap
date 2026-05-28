@@ -121,7 +121,7 @@ export function LoginForm() {
           hint={mode === "signup" ? "At least 6 characters." : undefined}
         />
         {notice && <p className="text-sm text-text-2">{notice}</p>}
-        <Button type="submit" fullWidth disabled={busy}>
+        <Button type="submit" fullWidth loading={busy}>
           {busy
             ? mode === "signin"
               ? "Signing in…"
