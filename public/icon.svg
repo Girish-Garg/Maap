@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Maskable-safe: full-bleed background, content within the centre safe zone.
+       The mark is three stacked bars of varying width (length / width / thickness),
+       per design.md §2.2. -->
+  <rect width="512" height="512" fill="#1C1917"/>
+  <g fill="#C2410C">
+    <rect x="146" y="158" width="220" height="56" rx="28"/>
+    <rect x="106" y="236" width="300" height="56" rx="28"/>
+    <rect x="176" y="314" width="160" height="56" rx="28"/>
+  </g>
+</svg>

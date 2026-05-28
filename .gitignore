@@ -16,16 +16,36 @@
 # production
 /build
 
-# misc
+# build caches
+.turbo/
+.swc/
+
+# OS files
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# misc
 *.pem
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
 
 # local env files
+.env
 .env*.local
 
 # vercel
@@ -34,3 +54,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase CLI
+.supabase/
+supabase/.temp/
+
+# Claude / preview session files (project preview config + local permissions)
+/.claude/
