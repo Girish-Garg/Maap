@@ -36,7 +36,7 @@ services:
       OCI_PREFIX: ${OCI_PREFIX:-maap}
       OCI_S3_ENDPOINT: ${OCI_S3_ENDPOINT:-}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3001}:3000"
     healthcheck:
       # /api/health also round-trips a query to Postgres, so an unhealthy
       # database shows up as an unhealthy container.
