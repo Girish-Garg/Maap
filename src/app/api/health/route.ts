@@ -11,11 +11,25 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ status: "ok", database: "up" });
+
+    return NextResponse.json({
+      ok: true,
+      status: "healthy",
+      service: "Maap",
+      database: "up",
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[health] database check failed:", error);
+
     return NextResponse.json(
-      { status: "error", database: "down" },
+      {
+        ok: false,
+        status: "unhealthy",
+        service: "Maap",
+        database: "down",
+        timestamp: new Date().toISOString(),
+      },
       { status: 503 },
     );
   }
