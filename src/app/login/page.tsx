@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/auth";
+import { env } from "@/lib/env";
 import { Wordmark } from "@/components/wordmark";
 import { LoginForm } from "./login-form";
 
@@ -9,11 +10,8 @@ import { LoginForm } from "./login-form";
  * straight to the project list.
  */
 export default async function LoginPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) redirect("/");
+  const session = await auth();
+  if (session?.user) redirect("/");
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6">
@@ -22,7 +20,8 @@ export default async function LoginPage() {
           <Wordmark className="text-3xl" />
           <p className="text-sm text-text-2">Precise wood measurement.</p>
         </div>
-        <LoginForm />
+        {/* Hidden rather than broken when Google isn't configured. */}
+        <LoginForm googleEnabled={env.googleConfigured} />
       </div>
     </main>
   );

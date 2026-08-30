@@ -1,9 +1,42 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import NextAuth from "next-auth";
+import { NextResponse } from "next/server";
+import { authConfig } from "@/auth.config";
 
-export async function middleware(request: NextRequest) {
-  return updateSession(request);
+/**
+ * Gates private routes. Anything outside PUBLIC_PATHS needs a session, and an
+ * unauthenticated request is sent to /login.
+ *
+ * Only the edge-safe half of the config is imported: middleware runs at the
+ * edge, where the Prisma adapter in auth.ts cannot load. Reading the session is
+ * pure JWT verification, so nothing here touches the database.
+ */
+const { auth } = NextAuth(authConfig);
+
+/** Paths reachable without a session. Everything else requires sign-in. */
+const PUBLIC_PATHS = ["/login", "/share", "/api/auth"];
+
+function isPublic(pathname: string): boolean {
+  return PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
 }
+
+export default auth((request) => {
+  const { pathname } = request.nextUrl;
+
+  // The container healthcheck reports on the app and its database. Redirecting
+  // it to /login would make an unhealthy container look healthy, because the
+  // probe follows the redirect and gets a 200.
+  if (pathname === "/api/health") return NextResponse.next();
+
+  if (!request.auth && !isPublic(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  return NextResponse.next();
+});
 
 export const config = {
   // Run on all paths except Next internals, static assets, and PWA files

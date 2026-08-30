@@ -1,17 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
+import { auth } from "@/auth";
 import { Card } from "@/components/ui/card";
-import { signOut } from "@/app/auth/actions";
 import { BusinessProfileForm } from "@/components/settings/business-profile-form";
 import { DimensionsEditor } from "@/components/settings/dimensions-editor";
+import { SignOutButton } from "@/components/settings/sign-out-button";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 
 /** Settings: appearance, business profile (for bills), dimensions, account. */
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await auth();
+  const user = session?.user;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -30,11 +27,7 @@ export default async function SettingsPage() {
             <p className="text-sm text-text-2">
               Signed in as <span className="font-mono">{user?.email}</span>
             </p>
-            <form action={signOut}>
-              <Button variant="secondary" type="submit">
-                Sign out
-              </Button>
-            </form>
+            <SignOutButton />
           </Card>
         </div>
       </div>

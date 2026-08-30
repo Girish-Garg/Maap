@@ -1,31 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSharedProject } from "@/lib/server/share";
 import { calculateSummary } from "@/lib/calc";
 import type { Prices, ProjectSummary, BucketResult } from "@/lib/types";
 import { formatINR, formatCFT, formatDate } from "@/lib/format";
 import { Wordmark } from "@/components/wordmark";
-
-interface SharedData {
-  project: {
-    name: string;
-    client_name: string | null;
-    client_address: string | null;
-    project_date: string;
-  };
-  business: {
-    business_name: string;
-    business_address: string | null;
-    business_phone: string | null;
-    logo_url: string | null;
-  } | null;
-  prices: Prices | null;
-  patia: {
-    length_ft: number;
-    width_in: number;
-    thickness_in: number;
-    quantity: number;
-  }[];
-  pawa: { length_in: number; size_side: number; quantity: number }[];
-}
 
 const ROWS: { key: keyof ProjectSummary; label: string }[] = [
   { key: "frame_3_4", label: 'Frame 3" & 4"' },
@@ -42,17 +19,6 @@ const DEFAULT_PRICES: Prices = {
   patia_5_5_to_up: 620,
   pawa: 510,
 };
-
-async function fetchShared(token: string): Promise<SharedData | null> {
-  // UUID guard so a malformed token doesn't error the RPC.
-  if (!/^[0-9a-f-]{36}$/i.test(token)) return null;
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_shared_project", {
-    share_token: token,
-  });
-  if (error || !data) return null;
-  return data as unknown as SharedData;
-}
 
 function NotFound() {
   return (
@@ -72,7 +38,7 @@ export default async function SharedBillPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const shared = await fetchShared(token);
+  const shared = await getSharedProject(token);
   if (!shared) return <NotFound />;
 
   const summary = calculateSummary(

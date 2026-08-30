@@ -1,23 +1,16 @@
 import { create } from "zustand";
+import type { PatiaCoords, PawaCoords } from "@/lib/db/types";
 
 /**
  * Transient UI state only (architecture.md §State management). Anything that
- * must survive a reload lives in TanStack Query / Supabase, never here.
+ * must survive a reload lives in TanStack Query / the database, never here.
  *
  * This store drives the grid editing session: which length chip is active on
  * the Patia tab, and which cell (if any) the numeric keypad is editing.
  */
 
-export interface PatiaCoords {
-  length_ft: number;
-  width_in: number;
-  thickness_in: number;
-}
-
-export interface PawaCoords {
-  length_in: number;
-  size_side: number;
-}
+// Re-exported for the grid components, which have always imported them here.
+export type { PatiaCoords, PawaCoords };
 
 /** The cell the numeric keypad is currently editing, plus its starting value. */
 export type EditTarget =

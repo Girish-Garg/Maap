@@ -1,0 +1,51 @@
+# Keeps the build context small and secrets out of the image.
+#
+# The Dockerfile does `COPY . .` in its builder stage, so anything not listed
+# here is sent to the daemon and can land in a layer. What must NOT be added:
+# prisma/ (the schema and the migrations the entrypoint replays),
+# docker-entrypoint.sh, prisma7.config.ts, and the app's config files - the
+# build fails without them.
+
+# dependencies and build output: reinstalled and rebuilt inside the image
+node_modules
+.next
+out
+build
+coverage
+
+# secrets - every .env form, including .env.local and any .env.backup-*.
+# Credentials reach the container through compose at run time, never a layer.
+.env
+.env.*
+
+# version control and CI
+.git
+.gitignore
+.github
+
+# local tooling and editors
+.claude
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# caches and logs
+.turbo
+.swc
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# docs and compose files: read on the host, never needed in the image
+*.md
+docker-compose*.yml
+.dockerignore
+
+# OS cruft
+.DS_Store
+Thumbs.db
+Desktop.ini

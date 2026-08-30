@@ -2,7 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import {
+  signInWithGoogle,
+  signInWithPassword,
+  signUpWithPassword,
+} from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -11,69 +15,49 @@ type Mode = "signin" | "signup";
 /**
  * Authentication: Continue with Google (OAuth) on top, with email + password
  * underneath. Google is the headline path; password works as a fallback and
- * for users without a Google account. Both finish at /auth/callback which sets
- * the session cookie and redirects to /projects.
+ * for users without a Google account.
+ *
+ * Both paths go through Server Actions - credentials never reach any client-side
+ * SDK, and the session cookie is set by Auth.js on the server.
  */
-export function LoginForm() {
+export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   async function handleGoogle() {
     setBusy(true);
     setError("");
-    setNotice("");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/projects`,
-      },
-    });
-    if (error) {
+    try {
+      await signInWithGoogle();
+      // On success the browser is navigating to Google; nothing more to do.
+    } catch {
       setBusy(false);
-      setError(error.message);
+      setError("Could not start Google sign-in. Try again.");
     }
-    // On success the browser is navigating to Google; no further action here.
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setNotice("");
-    const supabase = createClient();
 
-    if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setError(
-          error.message === "Invalid login credentials"
-            ? "Wrong email or password."
-            : error.message,
-        );
-        setBusy(false);
-        return;
-      }
-    } else {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message);
-        setBusy(false);
-        return;
-      }
-      // With email confirmation on, no session is returned until the user
-      // confirms. We surface that honestly instead of silently failing.
-      if (!data.session) {
-        setNotice("Account created. Check your email to confirm, then sign in.");
-        setMode("signin");
-        setBusy(false);
-        return;
-      }
+    const formData = new FormData();
+    formData.set("email", email);
+    formData.set("password", password);
+
+    const result =
+      mode === "signin"
+        ? await signInWithPassword(formData)
+        : await signUpWithPassword(formData);
+
+    if (result?.error) {
+      setError(result.error);
+      setBusy(false);
+      return;
     }
 
     router.push("/projects");
@@ -84,21 +68,25 @@ export function LoginForm() {
     <div className="flex w-full flex-col gap-4">
       {error && <p className="text-sm text-error">{error}</p>}
 
-      <button
-        type="button"
-        onClick={handleGoogle}
-        disabled={busy}
-        className="flex h-12 w-full items-center justify-center gap-3 rounded border border-border-strong bg-surface text-sm font-medium text-text transition-colors hover:bg-surface-2 disabled:opacity-50 md:h-10 md:text-base"
-      >
-        <GoogleIcon />
-        Continue with Google
-      </button>
+      {googleEnabled && (
+        <>
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={busy}
+            className="flex h-12 w-full items-center justify-center gap-3 rounded border border-border-strong bg-surface text-sm font-medium text-text transition-colors hover:bg-surface-2 disabled:opacity-50 md:h-10 md:text-base"
+          >
+            <GoogleIcon />
+            Continue with Google
+          </button>
 
-      <div className="flex items-center gap-3 text-xs text-text-3">
-        <hr className="flex-1 border-border" />
-        <span>or</span>
-        <hr className="flex-1 border-border" />
-      </div>
+          <div className="flex items-center gap-3 text-xs text-text-3">
+            <hr className="flex-1 border-border" />
+            <span>or</span>
+            <hr className="flex-1 border-border" />
+          </div>
+        </>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input
@@ -120,7 +108,6 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           hint={mode === "signup" ? "At least 6 characters." : undefined}
         />
-        {notice && <p className="text-sm text-text-2">{notice}</p>}
         <Button type="submit" fullWidth loading={busy}>
           {busy
             ? mode === "signin"
@@ -137,7 +124,6 @@ export function LoginForm() {
         onClick={() => {
           setMode((m) => (m === "signin" ? "signup" : "signin"));
           setError("");
-          setNotice("");
         }}
         className="text-sm text-text-2 underline-offset-4 hover:underline"
       >

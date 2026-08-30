@@ -1,7 +1,7 @@
 /**
  * Domain types shared across the calculation module, the data layer, and the UI.
- * Field names mirror the Postgres schema in architecture.md so the same shape
- * flows from `supabase-js` rows straight into `lib/calc.ts` without mapping.
+ * Field names mirror the Postgres schema (prisma/schema.prisma) so the same
+ * shape flows from a database row straight into `lib/calc.ts` without mapping.
  */
 
 /** One filled cell of the Patia grid: a plank of given length/width/thickness. */

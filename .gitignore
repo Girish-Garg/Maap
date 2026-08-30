@@ -45,8 +45,12 @@ lerna-debug.log*
 *.log
 
 # local env files
+# Everything except the template: .env holds DATABASE_URL, AUTH_SECRET, the
+# Google client secret, and the object storage keys. The pattern also covers
+# .env.local, .env.production and any .env.backup-* left behind by an edit.
 .env
-.env*.local
+.env.*
+!.env.example
 
 # vercel
 .vercel
@@ -55,9 +59,11 @@ lerna-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# supabase CLI
-.supabase/
-supabase/.temp/
+# prisma
+# The generated client lives in node_modules (already ignored above), so there
+# is nothing to add here. prisma/schema.prisma and prisma/migrations/ are part
+# of the source and MUST stay committed - `prisma migrate deploy` replays those
+# files on the VPS, and an ignored migration is a deploy that cannot run.
 
 # Claude / preview session files (project preview config + local permissions)
 /.claude/

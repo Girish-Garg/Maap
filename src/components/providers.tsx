@@ -6,6 +6,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { get, set, del } from "idb-keyval";
 import { Toaster } from "@/components/ui/toaster";
+import { QUERY_CACHE_KEY } from "@/lib/query-cache";
 
 const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
 
@@ -35,7 +36,9 @@ export function Providers({ children }: { children: ReactNode }) {
   // (during restore/persist effects), so this is SSR-safe.
   const [persister] = useState(() =>
     createAsyncStoragePersister({
-      key: "maap-query-cache",
+      // Shared with lib/query-cache.ts, which clears this same entry when the
+      // signed-in user changes.
+      key: QUERY_CACHE_KEY,
       storage: {
         getItem: (k) => get<string>(k).then((v) => v ?? null),
         setItem: (k, v) => set(k, v),

@@ -1,0 +1,63 @@
+# Local development stack.
+#
+#   docker compose up -d postgres     # just the database (run Next.js with npm)
+#   docker compose up -d              # database + the app, all in Docker
+#
+# Production does NOT use this file: the VPS has its own shared-postgres
+# container, so deployments use docker-compose.prod.yml, which brings up the app
+# alone and connects to that existing server. See README "Deployment".
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: maap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-maap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maap_password}
+      POSTGRES_DB: ${POSTGRES_DB:-maap}
+    ports:
+      # Host port is configurable so it can dodge an existing local Postgres.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-maap} -d ${POSTGRES_DB:-maap}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+    container_name: maap-app
+    restart: unless-stopped
+    environment:
+      # Built from the same POSTGRES_* values as the container above. Not taken
+      # from DATABASE_URL, because that one points at localhost for host-run dev
+      # and localhost inside this container is the container itself.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-maap}:${POSTGRES_PASSWORD:-maap_password}@postgres:5432/${POSTGRES_DB:-maap}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be set in .env}
+      AUTH_URL: ${AUTH_URL:-http://localhost:${APP_PORT:-3000}}
+      AUTH_TRUST_HOST: "true"
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      OCI_BUCKET: ${OCI_BUCKET:-}
+      OCI_NAMESPACE: ${OCI_NAMESPACE:-}
+      OCI_REGION: ${OCI_REGION:-}
+      OCI_ACCESS_KEY_ID: ${OCI_ACCESS_KEY_ID:-}
+      OCI_SECRET_ACCESS_KEY: ${OCI_SECRET_ACCESS_KEY:-}
+      OCI_PREFIX: ${OCI_PREFIX:-maap}
+      OCI_S3_ENDPOINT: ${OCI_S3_ENDPOINT:-}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        # Compose waits for pg_isready above, so `prisma migrate deploy` in the
+        # entrypoint never races the database's first startup.
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -1,15 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        // Business logos served from Supabase Storage public buckets.
-        protocol: "https",
-        hostname: "*.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-    ],
-  },
+  // No remote image hosts: the business logo is served from this origin by
+  // /api/logo, because the object storage bucket is private.
 };
 
 export default nextConfig;

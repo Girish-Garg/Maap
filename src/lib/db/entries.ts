@@ -1,12 +1,20 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import type { Database } from "@/lib/supabase/database.types";
-import type { PatiaCoords, PawaCoords } from "@/lib/store";
+import {
+  listPatiaEntries,
+  listPawaEntries,
+  setPatiaCell,
+  setPawaCell,
+} from "@/lib/server/entries";
+import type {
+  PatiaCoords,
+  PatiaEntry,
+  PawaCoords,
+  PawaEntry,
+} from "@/lib/db/types";
 
-export type PatiaEntry = Database["public"]["Tables"]["patia_entries"]["Row"];
-export type PawaEntry = Database["public"]["Tables"]["pawa_entries"]["Row"];
+export type { PatiaEntry, PawaEntry };
 
 export const entryKeys = {
   patia: (projectId: string) => ["patia_entries", projectId] as const,
@@ -14,32 +22,16 @@ export const entryKeys = {
 };
 
 export function usePatiaEntries(projectId: string) {
-  const supabase = createClient();
   return useQuery({
     queryKey: entryKeys.patia(projectId),
-    queryFn: async (): Promise<PatiaEntry[]> => {
-      const { data, error } = await supabase
-        .from("patia_entries")
-        .select("*")
-        .eq("project_id", projectId);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => listPatiaEntries(projectId),
   });
 }
 
 export function usePawaEntries(projectId: string) {
-  const supabase = createClient();
   return useQuery({
     queryKey: entryKeys.pawa(projectId),
-    queryFn: async (): Promise<PawaEntry[]> => {
-      const { data, error } = await supabase
-        .from("pawa_entries")
-        .select("*")
-        .eq("project_id", projectId);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => listPawaEntries(projectId),
   });
 }
 
@@ -55,37 +47,20 @@ const samePawa = (a: PawaCoords) => (e: PawaEntry) =>
  * Sets a Patia cell's quantity with optimistic UI (architecture.md §write flow).
  * Quantity 0 deletes the cell so empty cells stay genuinely empty (design §6.3).
  * On failure the cache rolls back to its previous snapshot and the caller shows
- * an error toast. Upserts are idempotent via the cell's unique constraint.
+ * an error toast. Writes are idempotent via the cell's unique constraint.
  */
 export function useSetPatiaCell(projectId: string) {
-  const supabase = createClient();
   const queryClient = useQueryClient();
   const key = entryKeys.patia(projectId);
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       coords,
       quantity,
     }: {
       coords: PatiaCoords;
       quantity: number;
-    }) => {
-      if (quantity <= 0) {
-        const { error } = await supabase
-          .from("patia_entries")
-          .delete()
-          .match({ project_id: projectId, ...coords });
-        if (error) throw error;
-        return;
-      }
-      const { error } = await supabase
-        .from("patia_entries")
-        .upsert(
-          { project_id: projectId, ...coords, quantity },
-          { onConflict: "project_id,length_ft,width_in,thickness_in" },
-        );
-      if (error) throw error;
-    },
+    }) => setPatiaCell(projectId, coords, quantity),
     onMutate: async ({ coords, quantity }) => {
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<PatiaEntry[]>(key) ?? [];
@@ -108,34 +83,17 @@ export function useSetPatiaCell(projectId: string) {
 
 /** Pawa equivalent of {@link useSetPatiaCell}. */
 export function useSetPawaCell(projectId: string) {
-  const supabase = createClient();
   const queryClient = useQueryClient();
   const key = entryKeys.pawa(projectId);
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       coords,
       quantity,
     }: {
       coords: PawaCoords;
       quantity: number;
-    }) => {
-      if (quantity <= 0) {
-        const { error } = await supabase
-          .from("pawa_entries")
-          .delete()
-          .match({ project_id: projectId, ...coords });
-        if (error) throw error;
-        return;
-      }
-      const { error } = await supabase
-        .from("pawa_entries")
-        .upsert(
-          { project_id: projectId, ...coords, quantity },
-          { onConflict: "project_id,length_in,size_side" },
-        );
-      if (error) throw error;
-    },
+    }) => setPawaCell(projectId, coords, quantity),
     onMutate: async ({ coords, quantity }) => {
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<PawaEntry[]>(key) ?? [];
