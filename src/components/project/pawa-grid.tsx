@@ -107,11 +107,10 @@ export function PawaGrid({
               }
             });
 
-          // Pawa has no thickness axis, so size is its only jump.
+          // Pawa has no thickness axis, so size is its only jump. Starts at the
+          // first length, matching where Next wraps to.
           const goNextSize = (quantity: number) =>
-            leaveCell(quantity, () =>
-              openCell(coords.length_in, sizes[si + 1]),
-            );
+            leaveCell(quantity, () => openCell(lengths[0], sizes[si + 1]));
 
           const isLastCell =
             li === lengths.length - 1 && si === sizes.length - 1;

@@ -145,12 +145,12 @@ export function PatiaGrid({
               }
             });
 
-          // Skip the rest of this width column and start the next thickness at
-          // the same width, so a run of one thickness doesn't mean tapping
-          // through every remaining width first.
+          // Skip the rest of this width column and start the next thickness
+          // from its first width - the same place Next lands when it runs off
+          // the end of a column, so both routes reach the same cell.
           const goNextThickness = (quantity: number) =>
             leaveCell(quantity, () =>
-              openCell(coords.length_ft, coords.width_in, thicknesses[ti + 1]),
+              openCell(coords.length_ft, widths[0], thicknesses[ti + 1]),
             );
 
           const goNextLength = (quantity: number) =>
