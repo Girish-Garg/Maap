@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  DeleteObjectsCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -92,6 +92,13 @@ export async function getObject(
  * Deletes everything under a prefix. Used when a logo is replaced or removed:
  * without it the bucket would keep every image a user ever uploaded, and a
  * changed file extension would leave the previous one stranded for good.
+ *
+ * Objects go one at a time rather than through S3's batch delete. Batch delete
+ * requires a checksum header, and the AWS SDK sends CRC32 by default (since
+ * v3.729); OCI accepts Content-MD5, SHA256 or CRC32C but not plain CRC32, and
+ * answers 400 InvalidRequest. Single deletes require no checksum, so they work
+ * everywhere - and a user's folder holds one file, so there is nothing to gain
+ * from batching.
  */
 export async function deletePrefix(prefix: string): Promise<number> {
   const s3 = client();
@@ -111,14 +118,11 @@ export async function deletePrefix(prefix: string): Promise<number> {
       .map((o) => o.Key)
       .filter((k): k is string => Boolean(k));
 
-    if (keys.length > 0) {
+    for (const Key of keys) {
       await s3.send(
-        new DeleteObjectsCommand({
-          Bucket: env.storageBucket,
-          Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
-        }),
+        new DeleteObjectCommand({ Bucket: env.storageBucket, Key }),
       );
-      deleted += keys.length;
+      deleted += 1;
     }
 
     continuationToken = listed.IsTruncated

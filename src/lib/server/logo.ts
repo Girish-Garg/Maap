@@ -17,6 +17,12 @@ import { deletePrefix, objectKey, putObject, userPrefix } from "./object-storage
  * Replacing or removing a logo deletes the previous object, so a user's folder
  * holds at most one file and the bucket doesn't accumulate images nobody can
  * reach any more.
+ *
+ * Failures come back as a value rather than an exception. Next.js replaces a
+ * thrown Server Action message with a generic one in production builds, so a
+ * throw here would reach Settings as "an error occurred" and the real cause
+ * would exist only in the container log. Returning it keeps the message intact
+ * for the user; the cause is logged as well, for the operator.
  */
 
 const MAX_LOGO_BYTES = 1_048_576; // 1 MB.
@@ -26,33 +32,41 @@ const EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
 };
 
-function assertConfigured(): void {
-  if (!env.storageConfigured) {
-    throw new Error(
-      "Logo storage is not configured. Set the OCI_* variables described in " +
-        ".env.example, or leave the logo unset.",
-    );
-  }
+/** Either the new logo URL, or a message to show under the logo in Settings. */
+export type LogoResult = { url: string | null } | { error: string };
+
+const NOT_CONFIGURED =
+  "Logo storage is not configured. Set the OCI_* variables described in " +
+  ".env.example, or leave the logo unset.";
+
+/** Logs the real error for the operator, and returns what the user should see. */
+function failure(action: string, error: unknown): { error: string } {
+  console.error(`[logo] ${action} failed:`, error);
+  const detail = error instanceof Error ? error.message : String(error);
+  return { error: `Could not ${action} the logo: ${detail}` };
 }
 
-/** Uploads a logo and returns the URL the app serves it from. */
-export async function uploadLogo(formData: FormData): Promise<string> {
+export async function uploadLogo(formData: FormData): Promise<LogoResult> {
   const userId = await requireUserId();
-  assertConfigured();
+  if (!env.storageConfigured) return { error: NOT_CONFIGURED };
 
   const file = formData.get("file");
-  if (!(file instanceof File)) throw new Error("No file was uploaded.");
+  if (!(file instanceof File)) return { error: "No file was uploaded." };
 
   const extension = EXTENSIONS[file.type];
-  if (!extension) throw new Error("Logo must be a PNG, JPG, or WebP image.");
-  if (file.size > MAX_LOGO_BYTES) throw new Error("Logo must be under 1 MB.");
-
-  // Clear the folder first rather than overwriting: the new file may have a
-  // different extension, and an overwrite would leave the old one behind.
-  await deletePrefix(userPrefix(userId));
+  if (!extension) return { error: "Logo must be a PNG, JPG, or WebP image." };
+  if (file.size > MAX_LOGO_BYTES) return { error: "Logo must be under 1 MB." };
 
   const key = objectKey(userId, `logo.${extension}`);
-  await putObject(key, new Uint8Array(await file.arrayBuffer()), file.type);
+
+  try {
+    // Clear the folder first rather than overwriting: the new file may have a
+    // different extension, and an overwrite would leave the old one behind.
+    await deletePrefix(userPrefix(userId));
+    await putObject(key, new Uint8Array(await file.arrayBuffer()), file.type);
+  } catch (error) {
+    return failure("upload", error);
+  }
 
   // The version marker changes on every upload so a replaced logo is not served
   // from a stale cache entry.
@@ -64,19 +78,27 @@ export async function uploadLogo(formData: FormData): Promise<string> {
     update: { logo_url: url, logo_key: key, updated_at: new Date() },
   });
 
-  return url;
+  return { url };
 }
 
 /** Deletes the stored object and clears the profile's reference to it. */
-export async function removeLogo(): Promise<void> {
+export async function removeLogo(): Promise<LogoResult> {
   const userId = await requireUserId();
-  assertConfigured();
+  if (!env.storageConfigured) return { error: NOT_CONFIGURED };
 
-  await deletePrefix(userPrefix(userId));
+  try {
+    await deletePrefix(userPrefix(userId));
+  } catch (error) {
+    // The profile is left pointing at the object: clearing it here would
+    // orphan a file nothing can reach or delete afterwards.
+    return failure("remove", error);
+  }
 
   await prisma.userProfile.upsert({
     where: { user_id: userId },
     create: { user_id: userId, logo_url: null, logo_key: null, updated_at: new Date() },
     update: { logo_url: null, logo_key: null, updated_at: new Date() },
   });
+
+  return { url: null };
 }

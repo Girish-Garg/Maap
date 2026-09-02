@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getProfile, updateProfile } from "@/lib/server/profile";
-import { removeLogo, uploadLogo } from "@/lib/server/logo";
+import { removeLogo, uploadLogo, type LogoResult } from "@/lib/server/logo";
 import type { Profile, ProfilePatch } from "@/lib/db/types";
 
 export type { Profile };
@@ -29,7 +29,18 @@ const MAX_LOGO_BYTES = 1_048_576; // 1 MB, matches the bucket limit.
 const LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"];
 
 /**
- * Uploads a logo and returns its public URL.
+ * The storage actions report failure as a returned value, because Next.js
+ * masks thrown Server Action messages in production. Turning it back into a
+ * rejection here lets the mutation's own error handling stay as it was, with
+ * the real message intact.
+ */
+function unwrap(result: LogoResult): string | null {
+  if ("error" in result) throw new Error(result.error);
+  return result.url;
+}
+
+/**
+ * Uploads a logo and returns the URL the app serves it from.
  *
  * The file goes to a Server Action, which is the only thing holding storage
  * credentials - the browser has none. Type and size are checked here to fail
@@ -38,7 +49,7 @@ const LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"];
 export function useUploadLogo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       if (!LOGO_MIMES.includes(file.type)) {
         throw new Error("Logo must be a PNG, JPG, or WebP image.");
       }
@@ -47,7 +58,7 @@ export function useUploadLogo() {
       }
       const formData = new FormData();
       formData.set("file", file);
-      return uploadLogo(formData);
+      return unwrap(await uploadLogo(formData));
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKey }),
   });
@@ -57,7 +68,7 @@ export function useUploadLogo() {
 export function useRemoveLogo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => removeLogo(),
+    mutationFn: async () => unwrap(await removeLogo()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKey }),
   });
 }

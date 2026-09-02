@@ -46,6 +46,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
     [patia.data, pawa.data, prices.data],
   );
 
+  // A project can disappear underneath an open tab: deleted from another
+  // device, or an id left in the offline cache that no longer exists. Say so
+  // instead of holding the header on its loading placeholder forever.
+  if (project.isError) return <MissingProject />;
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex items-center gap-2">
@@ -98,6 +103,24 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       {tab === "summary" && (
         <SummaryView summary={summary} projectId={projectId} />
       )}
+    </div>
+  );
+}
+
+/** Shown when the project behind this URL no longer exists. */
+function MissingProject() {
+  return (
+    <div className="flex flex-col items-center gap-3 py-16 text-center">
+      <h1 className="text-lg tracking-tight">This project no longer exists.</h1>
+      <p className="max-w-sm text-sm text-text-2">
+        It may have been deleted, or the link is out of date.
+      </p>
+      <Link
+        href="/projects"
+        className="mt-1 rounded bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+      >
+        Back to projects
+      </Link>
     </div>
   );
 }

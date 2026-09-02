@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUiStore } from "@/lib/store";
+import { useDebouncedAction } from "@/lib/use-debounced-action";
 import { useSetPatiaCell, type PatiaEntry } from "@/lib/db/entries";
 import { patiaCFT } from "@/lib/calc";
 import { formatCFT } from "@/lib/format";
@@ -31,6 +32,7 @@ export function PatiaGrid({
   const { activeLengthFt, setActiveLength, editing, openEditor, closeEditor } =
     useUiStore();
   const setCell = useSetPatiaCell(projectId);
+  const commitLater = useDebouncedAction();
 
   const lengths = dimensions.patia_lengths_ft;
   const widths = dimensions.patia_widths_in;
@@ -105,8 +107,10 @@ export function PatiaGrid({
           const ti = thicknesses.indexOf(coords.thickness_in);
           const li = lengths.indexOf(coords.length_ft);
 
-          const commit = (quantity: number) =>
-            setCell.mutate({ coords, quantity });
+          // Scheduled while typing; the closure keeps this cell's coordinates,
+          // so advancing flushes the write for the cell being left behind.
+          const scheduleCommit = (quantity: number) =>
+            commitLater.schedule(() => setCell.mutate({ coords, quantity }));
 
           // Open another cell, switching the active length if it changed.
           const openCell = (l: number, w: number, t: number) => {
@@ -118,51 +122,75 @@ export function PatiaGrid({
             });
           };
 
-          // Advance order: down the width column, then next thickness, then
-          // wrap to the next length's first cell.
-          const goNext = (quantity: number) => {
-            commit(quantity);
-            if (wi < widths.length - 1) {
-              openCell(coords.length_ft, widths[wi + 1], coords.thickness_in);
-            } else if (ti < thicknesses.length - 1) {
-              openCell(coords.length_ft, widths[0], thicknesses[ti + 1]);
-            } else if (li < lengths.length - 1) {
-              openCell(lengths[li + 1], widths[0], thicknesses[0]);
-            } else {
-              closeEditor();
-            }
+          // Every exit writes immediately rather than leaving the last edit
+          // waiting on the debounce.
+          const leaveCell = (quantity: number, then: () => void) => {
+            scheduleCommit(quantity);
+            commitLater.flush();
+            then();
           };
 
-          const goNextLength = (quantity: number) => {
-            commit(quantity);
-            if (li < lengths.length - 1) {
-              openCell(lengths[li + 1], widths[0], thicknesses[0]);
-            } else {
-              closeEditor();
-            }
-          };
+          // Advance order: down the width column, then next thickness, then
+          // wrap to the next length's first cell.
+          const goNext = (quantity: number) =>
+            leaveCell(quantity, () => {
+              if (wi < widths.length - 1) {
+                openCell(coords.length_ft, widths[wi + 1], coords.thickness_in);
+              } else if (ti < thicknesses.length - 1) {
+                openCell(coords.length_ft, widths[0], thicknesses[ti + 1]);
+              } else if (li < lengths.length - 1) {
+                openCell(lengths[li + 1], widths[0], thicknesses[0]);
+              } else {
+                closeEditor();
+              }
+            });
+
+          // Skip the rest of this width column and start the next thickness at
+          // the same width, so a run of one thickness doesn't mean tapping
+          // through every remaining width first.
+          const goNextThickness = (quantity: number) =>
+            leaveCell(quantity, () =>
+              openCell(coords.length_ft, coords.width_in, thicknesses[ti + 1]),
+            );
+
+          const goNextLength = (quantity: number) =>
+            leaveCell(quantity, () =>
+              openCell(lengths[li + 1], widths[0], thicknesses[0]),
+            );
 
           const isLastCell =
             wi === widths.length - 1 &&
             ti === thicknesses.length - 1 &&
             li === lengths.length - 1;
-          const hasNextLength = li < lengths.length - 1;
+
+          const jumps = [
+            ...(ti < thicknesses.length - 1
+              ? [
+                  {
+                    label: `Next thickness (${thicknesses[ti + 1]}″)`,
+                    onJump: goNextThickness,
+                  },
+                ]
+              : []),
+            ...(li < lengths.length - 1
+              ? [
+                  {
+                    label: `Next length (${lengths[li + 1]}′)`,
+                    onJump: goNextLength,
+                  },
+                ]
+              : []),
+          ];
 
           return (
             <NumericKeypad
               title={`Width ${coords.width_in}″ · ${coords.length_ft}′`}
               subtitle={`Thickness ${coords.thickness_in}″`}
               initial={editing.initial}
-              onClose={closeEditor}
-              onCommit={(quantity) => {
-                commit(quantity);
-                closeEditor();
-              }}
+              onChange={scheduleCommit}
+              onClose={(quantity) => leaveCell(quantity, closeEditor)}
               onNext={isLastCell ? undefined : goNext}
-              onNextLength={hasNextLength ? goNextLength : undefined}
-              nextLengthLabel={
-                hasNextLength ? `Next length (${lengths[li + 1]}′)` : undefined
-              }
+              jumps={jumps}
             />
           );
         })()}

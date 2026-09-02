@@ -76,10 +76,9 @@ const s = StyleSheet.create({
   logo: { width: 56, height: 56, objectFit: "contain", marginRight: 12 },
   bizName: { fontFamily: "Helvetica-Bold", fontSize: 16, color: INK },
   bizLine: { fontSize: 9, color: MUTED, marginTop: 2 },
-  rule: { borderBottomWidth: 1, borderBottomColor: LINE, marginVertical: 16 },
+  rule: { borderBottomWidth: 1, borderBottomColor: LINE },
   docTitle: { fontFamily: "Helvetica-Bold", fontSize: 18, letterSpacing: 0.5 },
   // Parties
-  parties: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
   label: { fontSize: 8, color: FAINT, marginBottom: 3, textTransform: "uppercase" },
   partyName: { fontSize: 11, color: INK },
   partyLine: { fontSize: 9, color: MUTED, marginTop: 2 },
@@ -88,7 +87,7 @@ const s = StyleSheet.create({
   quoteTitle: { fontFamily: "Helvetica-Bold", fontSize: 22, letterSpacing: 1.5, color: INK },
   quoteDate: { fontSize: 9, color: MUTED, marginTop: 5 },
   // Table
-  table: { marginTop: 24 },
+  table: {},
   tHead: {
     flexDirection: "row",
     backgroundColor: "#F5F5F4",
@@ -179,6 +178,33 @@ const s = StyleSheet.create({
   gBorder: { borderRightWidth: 0.5, borderRightColor: "#EEEDEB" },
 });
 
+/**
+ * How much the header actually has to show.
+ *
+ * A profile with no logo and no contact lines used to keep the full header
+ * height anyway, leaving a wide empty band across the top and pushing the table
+ * down the page for no reason. The spacing below is derived from this instead
+ * of being fixed, so a sparse profile produces a tight document rather than a
+ * mostly-blank one. The left/right structure is the same at every tier, so a
+ * business that adds a logo later still gets a recognisably similar bill.
+ */
+type HeaderTier = "full" | "compact" | "minimal";
+
+function headerTier(profile: BillProfile | null): HeaderTier {
+  const hasContact = Boolean(
+    profile?.business_address?.trim() || profile?.business_phone?.trim(),
+  );
+  if (profile?.logo_url) return "full";
+  return hasContact ? "compact" : "minimal";
+}
+
+/** Vertical rhythm per tier: less content above means less space below. */
+const SPACING: Record<HeaderTier, { rule: number; parties: number; table: number }> = {
+  full: { rule: 16, parties: 14, table: 24 },
+  compact: { rule: 12, parties: 12, table: 20 },
+  minimal: { rule: 9, parties: 10, table: 16 },
+};
+
 function Header({ profile }: { profile: BillProfile | null }) {
   return (
     <View style={s.headerRow}>
@@ -224,6 +250,8 @@ function BillPage({
     bucket: summary[r.key] as BucketResult,
   })).filter((r) => r.bucket.cft > 0);
 
+  const gap = SPACING[headerTier(profile)];
+
   return (
     <Page size="A4" style={s.page}>
       {/* Header: business block left, QUOTATION + date right */}
@@ -249,10 +277,10 @@ function BillPage({
         </View>
       </View>
 
-      <View style={s.rule} />
+      <View style={[s.rule, { marginVertical: gap.rule }]} />
 
       {/* Bill to */}
-      <View>
+      <View style={{ marginTop: gap.parties }}>
         <Text style={s.label}>Bill to</Text>
         <Text style={s.partyName}>
           {project.client_name?.trim() || project.name}
@@ -263,7 +291,7 @@ function BillPage({
       </View>
 
       {/* Items */}
-      <View style={s.table}>
+      <View style={[s.table, { marginTop: gap.table }]}>
         <View style={s.tHead}>
           <Text style={[s.th, s.itemCol]}>Item</Text>
           <Text style={[s.th, s.num, s.cftCol]}>CFT</Text>
@@ -381,7 +409,9 @@ function PatiaReferencePage({
   return (
     <Page size="A4" style={s.page}>
       <Header profile={profile} />
-      <View style={s.rule} />
+      <View
+        style={[s.rule, { marginVertical: SPACING[headerTier(profile)].rule }]}
+      />
       <Text style={s.sectionTitle}>Patia details</Text>
       <Text style={s.sectionSub}>
         {project.name} • {formatDate(project.project_date)} • reference for count
@@ -430,7 +460,9 @@ function PawaReferencePage({
   return (
     <Page size="A4" style={s.page}>
       <Header profile={profile} />
-      <View style={s.rule} />
+      <View
+        style={[s.rule, { marginVertical: SPACING[headerTier(profile)].rule }]}
+      />
       <Text style={s.sectionTitle}>Pawa details</Text>
       <Text style={s.sectionSub}>
         {project.name} • {formatDate(project.project_date)} • reference for count
