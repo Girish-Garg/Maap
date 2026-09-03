@@ -5,10 +5,10 @@ import { useUiStore } from "@/lib/store";
 import { useDebouncedAction } from "@/lib/use-debounced-action";
 import { useSetPatiaCell, type PatiaEntry } from "@/lib/db/entries";
 import { patiaCFT } from "@/lib/calc";
-import { formatCFT } from "@/lib/format";
 import type { Dimensions } from "@/lib/db/dimensions";
 import { LengthChips } from "./length-chips";
 import { QtyGrid } from "./qty-grid";
+import { CftTotals } from "./cft-totals";
 import { NumericKeypad } from "./numeric-keypad";
 
 type Dims = Omit<Dimensions, "user_id">;
@@ -56,9 +56,26 @@ export function PatiaGrid({
   );
 
   // Live CFT for the active length (the bottom strip, design.md §7.3).
-  const lengthTotalCFT = entries
-    .filter((e) => e.length_ft === active)
-    .reduce((sum, e) => sum + patiaCFT(e), 0);
+  const forLength = entries.filter((e) => e.length_ft === active);
+  const lengthTotalCFT = forLength.reduce((sum, e) => sum + patiaCFT(e), 0);
+
+  // One row per thickness column. Built from the configured thicknesses plus
+  // any the entries actually use, so a value removed in Settings still shows
+  // up here and the rows keep adding up to the length total.
+  const cftByThickness = new Map<number, number>();
+  for (const t of Array.from(
+    new Set([...thicknesses, ...forLength.map((e) => e.thickness_in)]),
+  )) {
+    cftByThickness.set(
+      t,
+      forLength
+        .filter((e) => e.thickness_in === t)
+        .reduce((sum, e) => sum + patiaCFT(e), 0),
+    );
+  }
+  const thicknessRows = Array.from(cftByThickness.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([t, cft]) => ({ label: `${t}″`, cft }));
 
   if (active === null) return null;
 
@@ -90,15 +107,15 @@ export function PatiaGrid({
             initial: qtyByCell.get(cellKey(active, w, t)) ?? 0,
           })
         }
+        colTotal={(t) => cftByThickness.get(t) ?? 0}
       />
 
-      {/* Length-total strip - the only accent on this tab (design.md §7.3). */}
-      <div className="flex items-center justify-between rounded-md bg-accent-soft px-4 py-3">
-        <span className="text-sm text-accent-text">Length total</span>
-        <span className="font-mono text-sm text-accent-text">
-          {formatCFT(lengthTotalCFT)} CFT
-        </span>
-      </div>
+      {/* Length totals - the only accent on this tab (design.md §7.3). */}
+      <CftTotals
+        rows={thicknessRows}
+        totalLabel="Length total"
+        total={lengthTotalCFT}
+      />
 
       {editing?.kind === "patia" &&
         (() => {

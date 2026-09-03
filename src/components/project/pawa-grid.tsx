@@ -4,9 +4,9 @@ import { useUiStore } from "@/lib/store";
 import { useDebouncedAction } from "@/lib/use-debounced-action";
 import { useSetPawaCell, type PawaEntry } from "@/lib/db/entries";
 import { pawaCFT } from "@/lib/calc";
-import { formatCFT } from "@/lib/format";
 import type { Dimensions } from "@/lib/db/dimensions";
 import { QtyGrid } from "./qty-grid";
+import { CftTotals } from "./cft-totals";
 import { NumericKeypad } from "./numeric-keypad";
 
 type Dims = Omit<Dimensions, "user_id">;
@@ -40,6 +40,24 @@ export function PawaGrid({
 
   const totalCFT = entries.reduce((sum, e) => sum + pawaCFT(e), 0);
 
+  // One row per size column, the Pawa counterpart of Patia's thicknesses.
+  // Sizes the entries use are included even when no longer configured, so the
+  // rows always add up to the total beneath them.
+  const cftBySize = new Map<number, number>();
+  for (const s of Array.from(
+    new Set([...sizes, ...entries.map((e) => e.size_side)]),
+  )) {
+    cftBySize.set(
+      s,
+      entries
+        .filter((e) => e.size_side === s)
+        .reduce((sum, e) => sum + pawaCFT(e), 0),
+    );
+  }
+  const sizeRows = Array.from(cftBySize.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([s, cft]) => ({ label: `${s}×${s}`, cft }));
+
   return (
     <div className="flex flex-col gap-4">
       <QtyGrid
@@ -60,14 +78,10 @@ export function PawaGrid({
             initial: qtyByCell.get(cellKey(l, s)) ?? 0,
           })
         }
+        colTotal={(s) => cftBySize.get(s) ?? 0}
       />
 
-      <div className="flex items-center justify-between rounded-md bg-accent-soft px-4 py-3">
-        <span className="text-sm text-accent-text">Pawa total</span>
-        <span className="font-mono text-sm text-accent-text">
-          {formatCFT(totalCFT)} CFT
-        </span>
-      </div>
+      <CftTotals rows={sizeRows} totalLabel="Pawa total" total={totalCFT} />
 
       {editing?.kind === "pawa" &&
         (() => {
