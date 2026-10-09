@@ -5,9 +5,16 @@ on:
     branches:
       - master
 
+# Queue deploys instead of running two at once (the second would fail on the server lock
+# and could leave the newest commit undeployed).
+concurrency:
+  group: deploy-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
 
     steps:
       - name: Deploy to VPS
@@ -16,5 +23,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Default is 10m; a cold ARM build plus health checks can exceed that.
+          command_timeout: 30m
           script: |
             /opt/platform/deploy.sh Maap
